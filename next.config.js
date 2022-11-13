@@ -7,6 +7,10 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "images.wallpaperscraft.com",
+      },
+      {
+        protocol: "http",
+        hostname: "localhost",
       }
     ]
   }
