@@ -11,6 +11,10 @@ const nextConfig = {
       {
         protocol: "http",
         hostname: "localhost",
+      },
+      {
+        protocol: "https",
+        hostname: "fa52-202-80-217-88.ap.ngrok.io"
       }
     ]
   }

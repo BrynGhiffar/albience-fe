@@ -1,12 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import path from 'path';
-import fs from 'fs';
-import { PhotoStore, GetPhotoResponse, MissingRouteResponse, PostPhotoResponse } from "../../commons/types";
+import { GET_IMAGE, HOST } from "../../commons/env";
+import { PhotoStore, GetPhotoResponse, MissingRouteResponse, PostPhotoResponse, GetRandomPhotoResponse } from "../../commons/types";
+import { getConfiguration } from "../../utility/config";
 import { addPhoto, batchDelete, deletePhoto, getAllPhoto } from "../../utility/photo";
-
-const dataDirectory = path.join(process.cwd(), 'data');
-const photosName = "photos.json";
-
 
 export const config = {
     api: {
@@ -16,18 +12,28 @@ export const config = {
     }
 }
 
+// const HOST = "http://localhost:3000";
 
 export default function handler(
   req: NextApiRequest,
-  res: NextApiResponse<GetPhotoResponse | MissingRouteResponse | PostPhotoResponse>
+  res: NextApiResponse<GetPhotoResponse | GetRandomPhotoResponse | MissingRouteResponse | PostPhotoResponse>
 ) {
     if (req.method === 'GET') {
         // going to return appropriate images depending on configuration
-        const photos: PhotoStore[] = getAllPhoto();
-        const photoResponse: GetPhotoResponse = {
-            photos
-        };
-        res.status(200).json(photoResponse);
+        const { "random-image": random_image } = req.query;
+        if (!(random_image == null || random_image == undefined)) {
+            const photos: PhotoStore[] = getAllPhoto();
+            const choice = Math.floor(Math.random() * photos.length);
+            const url = `${HOST}${GET_IMAGE}/${photos[choice].id}`;
+            const response: GetRandomPhotoResponse = { photo_url:  url };
+            return res.status(200).json(response);
+        } else {
+            const photos: PhotoStore[] = getAllPhoto();
+            const photoResponse: GetPhotoResponse = {
+                photos
+            };
+            res.status(200).json(photoResponse);
+        }
     } else if (req.method === 'POST') {
         const newPhoto: PhotoStore = req.body;
         addPhoto(newPhoto);

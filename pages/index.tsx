@@ -1,101 +1,50 @@
 import { Button, Switch } from '@mui/material';
 import Image from 'next/image'
-import backgroundImage from "../public/flower_background.jpg";
 import styles from "../styles/Home.module.css";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { getAllPhoto } from '../utility/photo';
-import { PhotoStore } from '../commons/types';
-
-const HOST = "http://localhost:3000";
+import { Configuration, PhotoStore } from '../commons/types';
+import { getConfiguration, toggleSeasonalTagging } from '../client_side_utils/configuration';
+import { addPhoto, deletePhoto, extractBase64 } from '../client_side_utils/photo';
+import { GET_IMAGE, HOST } from '../commons/env';
+import Head from 'next/head';
 
 function SeasonalTaggingSetting() {
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    getConfiguration()
+      .then(result => {
+        if (result !== undefined) {
+          setChecked(_ => result.seasonalTagging);
+        }
+      })
+  }, [checked]);
+
   return (
     <div className={styles.settings_container}>
       <div className={styles.seasonal_tagging_container}>
         <div className={styles.settings_title}><p>SEASONAL TAGGING</p></div>
-        <Switch/>
+        <Switch checked={checked} onChange={e => {
+          toggleSeasonalTagging(e.target.checked);
+          setChecked(_ => e.target.checked);
+        }}/>
       </div>
     </div>
   )
 }
 
-function addPhoto(newPhoto: PhotoStore) {
-  var myHeaders = new Headers();
-  myHeaders.append("Content-Type", "application/json");
-
-  var raw = JSON.stringify(newPhoto);
-
-  var requestOptions = {
-    method: 'POST',
-    headers: myHeaders,
-    body: raw,
-    redirect: 'follow'
-  };
-
-  // @ts-ignore
-  fetch("http://localhost:3000/api/photo", requestOptions)
-    .then(response => response.text())
-    .then(result => console.log(result))
-    .catch(error => console.log('error', error));
-}
-
-function deletePhoto(ids: string[]) {
-
-}
-
-function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
   const { target } = event;
   const { files } = target;
-  let readers: FileReader[] = [];
-  if (files != null) {
-    console.log(files);
-    for (let fi = 0; fi < files.length; fi++) {
-      const file = files[fi];
-      var reader = new FileReader();
-      console.log(file.name);
-      reader.onload = function () {
-
-        const base64 = this.result?.toString();
-        console.log(base64?.substring(20, 40));
-        const newPhoto: PhotoStore= {
-          "id": null,
-          "name": file.name,
-          "photoBase64": base64!,
-          "date": file.lastModified.toString(),
-        }
-
-        addPhoto(newPhoto);
-      };
-      reader.onerror = function (error) {
-        console.log('Error: ', error);
-      };
-      reader.readAsDataURL(file);
-      readers.push(reader);
-    }
+  if (files !== null) {
+    const photos = await extractBase64(files); 
+    photos.forEach(async (photo: PhotoStore) => {
+      await addPhoto(photo);
+    });
   }
-}
-
-function handleDeletePhotos(ids: string[]) {
-  var myHeaders = new Headers();
-  myHeaders.append("Content-Type", "application/json");
-
-  var raw = JSON.stringify({
-    "ids": ids
-  });
-
-  var requestOptions = {
-    method: 'DELETE',
-    headers: myHeaders,
-    body: raw,
-    redirect: 'follow'
-  };
-
-    // @ts-ignore
-  fetch("http://localhost:3000/api/photo", requestOptions)
-    .then(response => response.text())
-    .then(result => console.log(result))
-    .catch(error => console.log('error', error));
+  
 }
 
 function UploadPhotoButton() {
@@ -108,15 +57,18 @@ function UploadPhotoButton() {
       Upload Image
       <input
         type="file"
-        hidden
-        onChange={e => {
-          handleUpload(e);
-          setTimeout(_ => router.reload(), 2000);
-        }}
+        accept="image/*"
         multiple
+        hidden
+        onChange={async e => {
+          handleUpload(e)
+            .then(_ => {
+              setTimeout(_ => router.reload(), 2000);
+            });
+        }}
       />
     </Button>
-  )
+  );
 }
 
 type DeletePhotoButtonProps = {
@@ -131,17 +83,11 @@ function DeletePhotoButton({ ids, setSelectedImages } : DeletePhotoButtonProps) 
     component="label" 
     color="error"
     onClick={_ => {
-      handleDeletePhotos(ids);
+      deletePhoto(ids);
       setTimeout(_ => router.reload(), 2000);
     }}
   >Delete Image Selections</Button>);
 }
-
-let links = [
-  "https://images.wallpaperscraft.com/image/single/irbis_predator_big_cat_412420_1920x1080.jpg",
-  "https://images.wallpaperscraft.com/image/single/irbis_predator_big_cat_412420_1920x1080.jpg",
-  "https://images.wallpaperscraft.com/image/single/irbis_predator_big_cat_412420_1920x1080.jpg"
-]
 
 type ServerSideProps = {
   num: number,
@@ -164,7 +110,7 @@ type UploadPhotoSettingProps = {
 }
 
 function UploadPhotosSetting({ images }: UploadPhotoSettingProps) {
-  const endpoint = (id: string | null) => `${HOST}/api/image/${id}`;
+  const endpoint = (id: string | null) => `${HOST}${GET_IMAGE}/${id}`;
 
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
@@ -198,10 +144,14 @@ function UploadPhotosSetting({ images }: UploadPhotoSettingProps) {
   )
 }
 
-export default function Home({ num, images } : ServerSideProps) {
+export default function Home({ images } : ServerSideProps) {
 
   return (
     <div className={styles.container}>
+      <Head>
+        <title>Albience - Dashboard</title>
+        <link rel="icon" href="/camera.png"/>
+      </Head>
       <div className={styles.inner_container}>
         <main className={styles.main_container}>
           <h1 className={styles.title}>ALBIENCE</h1>
